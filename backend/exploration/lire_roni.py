@@ -1,5 +1,3 @@
-
-
 observations = []
 
 with open("../../data/raw/roni_2026-10-27.txt", encoding="utf-8") as fichier:
