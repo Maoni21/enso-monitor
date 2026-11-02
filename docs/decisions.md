@@ -62,3 +62,39 @@ Voir `data/SOURCES.md`, section « Choix de l'indice ».
 - **Pourquoi :** le résultat est toujours le même à chaque exécution, et le rapport rend l'anomalie visible.
 - **Limites :** si la bonne valeur est la deuxième, on garde la mauvaise. Le rapport permet de le repérer.
 - **Deuxième sécurité :** la base aura une contrainte `UNIQUE` sur la date (voir le 29 octobre).
+
+---
+
+## D6. Schéma de la base de données
+
+- **Besoin :** stocker les observations durablement, savoir d'où vient chaque observation, filtrer vite par période, et ne jamais avoir deux valeurs pour la même date.
+- **Tables :**
+  - `indice` : nom, nom complet, unité. Une ligne par indice (RONI).
+  - `source` : producteur, URL, version. Qui produit les données et où les trouver. Ne change pas d'un téléchargement à l'autre.
+  - `import` : date d'extraction, fichier brut, moment de l'import, et le rapport (lues, rejetées, doublons, gardées). Une ligne à chaque lancement du script.
+  - `observation` : date, saison, anomalie. Une ligne par mesure.
+- **Liens (clés étrangères) :**
+  - `observation.indice_id` → `indice.id` : plusieurs observations appartiennent à un indice.
+  - `observation.import_id` → `import.id` : plusieurs observations viennent d'un import.
+  - `import.source_id` → `source.id` : plusieurs imports lisent le fichier d'une même source.
+  - Règle : la clé étrangère se met du côté « plusieurs ». Un import ne peut pas stocker 920 numéros d'observations, mais chaque observation peut stocker un numéro d'import.
+- **Chaque information à un seul endroit (normalisation) :** l'unité est dans `indice`, pas répétée 920 fois dans `observation`. Si elle change, on la modifie une seule fois.
+- **Unicité :** contrainte `UNIQUE (indice_id, date)` sur `observation`. Une seule valeur par indice et par date. C'est la deuxième sécurité contre les doublons, après `transform.py` (D5).
+- **Index :** la contrainte `UNIQUE (indice_id, date)` crée automatiquement un index, qui sert aussi au filtre par période de l'API.
+- **Traçabilité :** pour une observation, on retrouve son fichier brut et son URL en suivant `observation` → `import` → `source`.
+- **Limites :** 4 tables pour un seul indice, c'est un peu plus que le strict nécessaire. Mais ça correspond au modèle demandé par le sujet, et ça permettrait d'ajouter l'ONI sans changer le schéma.
+
+---
+
+## D7. Relancer l'import : la dernière valeur l'emporte
+
+- **Besoin :** pouvoir relancer l'import sans créer de doublon, et prendre en compte les corrections de la NOAA (les valeurs récentes sont révisées pendant environ deux mois).
+- **Options :**
+  - A. ignorer les observations déjà en base (`ON CONFLICT DO NOTHING`) ;
+  - B. remplacer la valeur par la nouvelle (`ON CONFLICT DO UPDATE`, appelé « upsert ») ;
+  - C. une interface pour choisir à la main.
+- **Choix :** B. Si l'observation (indice, date) existe déjà, son anomalie est remplacée et elle pointe vers le nouvel import.
+- **Pourquoi :** la valeur la plus récente de la NOAA est la plus juste. L'option C est une fonctionnalité en plus, hors MVP.
+- **Traçabilité :** chaque lancement crée une ligne dans `import` avec son rapport. L'observation pointe vers l'import qui a fourni sa valeur actuelle.
+- **Ordre de remplissage :** `indice` et `source` d'abord (« obtenir ou créer » : on cherche la ligne, on la crée seulement si elle n'existe pas), puis `import`, puis `observation`. Une table qui pointe vers une autre est remplie après elle.
+- **Limites :** l'ancienne valeur n'est conservée nulle part. Une table d'historique des valeurs serait possible, mais hors MVP.
