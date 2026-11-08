@@ -2,4 +2,5 @@
 __pycache__/
 node_modules/
 .env
-.DS_StoreClaude outputs/
+.DS_Store
+Claude outputs/
