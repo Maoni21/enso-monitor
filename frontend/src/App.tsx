@@ -26,6 +26,10 @@ function App() {
   }, []);
 
   // À toi : charger les observations au démarrage, sur le même modèle que l'indice.
+  useEffect(()=> {
+    getObservations().then((resultat) => setObservations(resultat));
+  }, []);
+
 
   return (
     <main>
