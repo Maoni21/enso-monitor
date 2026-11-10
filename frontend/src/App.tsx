@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-
+import CourbeAnomalies from "./CourbeAnomalies";
 import { getIndice, getObservations } from "./api";
 import type { Indice, Observation } from "./types";
 
@@ -25,11 +25,9 @@ function App() {
     getIndice().then((resultat) => setIndice(resultat));
   }, []);
 
-  // À toi : charger les observations au démarrage, sur le même modèle que l'indice.
   useEffect(()=> {
     getObservations().then((resultat) => setObservations(resultat));
   }, []);
-
 
   return (
     <main>
@@ -37,6 +35,7 @@ function App() {
       <p>Exploration de l'indice RONI de la NOAA</p>
       <p>{observations.length} observations chargées</p>
       {indice && <Source indice={indice} />}
+      <CourbeAnomalies observations={observations} />
     </main>
   );
 }
