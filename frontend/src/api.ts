@@ -47,3 +47,17 @@ export function getComparaison(debutA: string, finA: string, debutB: string, fin
   params.set("fin_b", finB);
   return lireJson<Comparaison>(`/comparaison?${params}`);
 }
+
+/**
+ * Traduit une erreur d'appel à l'API en phrase compréhensible pour l'utilisateur.
+ * message422 : la phrase à afficher quand l'API refuse la demande (code 422).
+ */
+export function messageErreur(erreur: unknown, message422: string): string {
+  if (erreur instanceof ApiError && erreur.status === 422) {
+    return message422;
+  }
+  if (erreur instanceof ApiError) {
+    return `Le serveur a renvoyé une erreur (code ${erreur.status}). Réessayez plus tard.`;
+  }
+  return "Le serveur ne répond pas. Vérifiez que l'API est lancée, puis rechargez la page.";
+}
