@@ -1,0 +1,27 @@
+# Configuration de Caddy, le serveur web placé devant l'application.
+# DOMAINE vaut ":80" par défaut (accès par l'adresse IP, sans HTTPS).
+# Sur le VPS, mettre DOMAINE=enso.mon-domaine.fr dans .env : Caddy obtient alors
+# automatiquement un certificat HTTPS (Let's Encrypt) et redirige HTTP vers HTTPS.
+{$DOMAINE::80} {
+	# Les appels à l'API sont transmis au conteneur « api », sur le réseau interne de Docker.
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Tout le reste : les fichiers du site React.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	# Compresse les réponses (le JSON des 920 observations passe beaucoup plus vite).
+	encode gzip
+
+	# En-têtes de sécurité de base.
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

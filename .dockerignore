@@ -1,0 +1,9 @@
+# Fichiers à ne jamais copier dans les images Docker : secrets, dépendances locales, historique.
+.env
+.git
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/dist
+Claude outputs
