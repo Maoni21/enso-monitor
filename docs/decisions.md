@@ -98,3 +98,128 @@ Voir `data/SOURCES.md`, section « Choix de l'indice ».
 - **Traçabilité :** chaque lancement crée une ligne dans `import` avec son rapport. L'observation pointe vers l'import qui a fourni sa valeur actuelle.
 - **Ordre de remplissage :** `indice` et `source` d'abord (« obtenir ou créer » : on cherche la ligne, on la crée seulement si elle n'existe pas), puis `import`, puis `observation`. Une table qui pointe vers une autre est remplie après elle.
 - **Limites :** l'ancienne valeur n'est conservée nulle part. Une table d'historique des valeurs serait possible, mais hors MVP.
+
+---
+
+## D8. Découpage de l'API en trois fichiers
+
+- **Besoin :** une API facile à tester et à faire évoluer.
+- **Choix :**
+  - `main.py` : le HTTP uniquement (routes, paramètres, codes 404 et 422) ;
+  - `repository.py` : les requêtes à la base ;
+  - `comparaison.py` : les calculs (pic, moyenne, durée), sans base de données.
+- **Pourquoi :** les calculs se testent avec de simples listes de nombres, sans démarrer PostgreSQL (`test_comparaison.py`). Chaque fichier a une seule raison de changer.
+- **Limites :** un fichier de plus à ouvrir pour suivre une requête de bout en bout.
+
+---
+
+## D9. Comparaison par périodes libres, au mois près
+
+- **Besoin :** comparer deux épisodes, alors qu'un épisode El Niño est presque toujours à cheval sur deux années (1997-1998, 2015-2016).
+- **Options :** choisir deux années civiles, ou deux périodes libres (date de début et de fin).
+- **Choix :** deux périodes libres. Les deux exemples préremplis sont 1997-04-01 → 1998-06-01 et 2015-01-01 → 2016-06-01.
+- **Pourquoi :** une année civile couperait l'épisode en deux et fausserait le pic et la durée.
+- **Limites :** l'utilisateur doit connaître à peu près les dates de l'épisode. La courbe l'aide à les repérer.
+
+---
+
+## D10. Durée El Niño : la plus longue suite de saisons consécutives
+
+- **Besoin :** mesurer combien de temps un épisode reste au-dessus du seuil de +0,5 °C.
+- **Options :** compter toutes les saisons au-dessus du seuil, ou la plus longue suite **sans interruption**.
+- **Choix :** la plus longue suite de saisons consécutives à +0,5 °C ou plus (`plus_longue_serie`).
+- **Pourquoi :** la NOAA définit un épisode par des saisons consécutives. Exemple : en 2015, DJF à 0,54 puis JFM à 0,47 casse la série.
+- **Limites :** une seule saison sous le seuil coupe la durée en deux, même si l'épisode reprend juste après.
+
+---
+
+## D11. TypeScript 6 au lieu de 7
+
+- **Besoin :** vérifier le code frontend avec ESLint.
+- **Constat :** `typescript-eslint` n'acceptait pas encore TypeScript 7.
+- **Choix :** TypeScript 6, en mode `strict`.
+- **Limites :** il faudra passer à la version 7 quand les outils la prendront en charge.
+
+---
+
+## D12. La courbe : Recharts, axe fixe de −3 à +3 °C
+
+- **Besoin :** une courbe interactive des 920 saisons, avec les seuils El Niño et La Niña.
+- **Choix :**
+  - Recharts : des composants React (`LineChart`, `XAxis`, `Line`…), lisibles sans connaître le dessin SVG ;
+  - pas de point sur chaque valeur (`dot={false}`), sinon 920 points rendent la courbe illisible ;
+  - axe vertical fixé de −3 à +3 °C.
+- **Pourquoi l'axe fixe :** automatiquement, Recharts montait jusqu'à +6 °C, ce qui laissait la moitié du graphique vide et écrasait les pics. Un axe symétrique autour de 0 donne le même poids visuel à El Niño et à La Niña, et toutes les valeurs depuis 1950 y tiennent.
+- **Limites :** si une valeur dépassait ±3 °C un jour, il faudrait élargir l'axe.
+
+---
+
+## D13. Le filtre de période
+
+- **Besoin :** n'afficher que la période choisie par l'utilisateur.
+- **Choix :**
+  - deux états `start` et `end` dans `App`, le composant qui fait l'appel à l'API ;
+  - le `useEffect` des observations surveille `[start, end]` : il rappelle l'API à chaque changement ;
+  - des champs natifs `<input type="date">` : le navigateur fournit le calendrier, il fonctionne au clavier, et il donne le format `AAAA-MM-JJ` attendu par l'API.
+- **Pourquoi filtrer côté serveur :** l'API sait déjà filtrer (`start`, `end`), et le navigateur ne reçoit que les données utiles.
+- **Conséquence de D3 :** les observations sont datées du 1er du mois. Du 11 janvier 2009 au 11 janvier 2010, on obtient 12 saisons et pas 13 : DJF 2009 (datée du 2009-01-01) est avant le 11 janvier.
+- **Limites :** si l'utilisateur change très vite de période, une ancienne réponse pourrait en théorie arriver après la nouvelle. Ce cas n'est pas géré.
+
+---
+
+## D14. Gestion des erreurs
+
+- **Besoin :** l'utilisateur doit comprendre ce qui se passe, au lieu de voir une page vide.
+- **Choix :**
+  - la règle « le début doit être avant la fin » est vérifiée **par le serveur** (422), car on ne peut pas faire confiance au navigateur : n'importe qui peut appeler l'API directement ;
+  - le frontend traduit l'erreur en phrase (`messageErreur` dans `api.ts`) : 422 → message sur les dates, autre code → « réessayez plus tard », pas de réponse → « le serveur ne répond pas » ;
+  - trois états affichés : chargement, erreur, période sans donnée.
+- **Accessibilité :** le message d'erreur a `role="alert"` et le compteur `role="status"`, pour qu'un lecteur d'écran les annonce.
+- **Limites :** le message 422 du filtre suppose que la seule erreur possible est une période inversée, ce qui est vrai avec des champs de date natifs.
+
+---
+
+## D15. Le test frontend
+
+- **Besoin :** le 3ᵉ test obligatoire : changer la période met à jour la courbe.
+- **Choix :** Vitest + Testing Library + jsdom (un faux navigateur).
+  - les appels à l'API sont remplacés par de fausses fonctions (`vi.mock`), qui suivent les mêmes règles que la vraie API ;
+  - la courbe Recharts est remplacée par une fausse courbe qui affiche le nombre de points reçus, car Recharts ne sait pas se dessiner dans jsdom.
+- **Vérification :** si on remet `[]` à la place de `[start, end]` dans le `useEffect`, les tests échouent. Ils détectent donc bien le bug.
+- **Limites :** le dessin réel de la courbe n'est pas testé, seulement les données qu'elle reçoit.
+
+---
+
+## D16. Une interprétation prudente de la comparaison
+
+- **Besoin :** le sujet demande une interprétation prudente. « Super El Niño » n'est pas une catégorie scientifique.
+- **Choix :**
+  - un écart de pic de moins de 0,1 °C est présenté comme « presque identique », sans désigner de gagnant (1997 : 2,28 °C contre 2015 : 2,25 °C) ;
+  - l'indice et le seuil sont toujours affichés ;
+  - un avertissement rappelle qu'un autre indice ou un autre seuil peut changer la conclusion, que les valeurs récentes sont provisoires, et qu'il ne s'agit pas d'une prévision.
+- **Pourquoi 0,1 °C :** les valeurs sont publiées à 0,01 °C près, mais les révisions de la NOAA et le choix de l'indice (RONI ou ONI) déplacent les valeurs bien plus que de quelques centièmes. C'est un seuil de prudence choisi pour ce projet, pas une norme officielle.
+- **Limites :** le texte est généré par des règles simples. Il ne remplace pas l'avis d'un climatologue.
+
+---
+
+## D17. Accessibilité et mobile
+
+- **Choix :**
+  - chaque champ a un `<label>` relié par `htmlFor`, et les champs d'une période sont groupés dans un `<fieldset>` avec une `<legend>` ;
+  - le graphique a une description (`<figcaption>`) et les mêmes données en **tableau**, pour les personnes qui ne peuvent pas lire un graphique ;
+  - contour visible au clavier (`:focus-visible`), contrastes au niveau AA, page en `lang="fr"` ;
+  - sur un écran de moins de 600 px, les champs passent les uns sous les autres et les tableaux défilent dans leur cadre.
+- **Limites :** pas encore testé avec un vrai lecteur d'écran (VoiceOver).
+
+---
+
+## D18. Déploiement : Docker Compose et Caddy
+
+- **Besoin :** documenter un déploiement sur un VPS, sécurisé et reproductible.
+- **Choix :**
+  - `compose.prod.yaml` lance trois conteneurs : `db` (PostgreSQL), `api` (FastAPI) et `web` (Caddy + le site construit) ;
+  - Caddy sert le site **et** transmet `/api/*` à l'API : tout est à la même adresse, donc pas besoin de CORS en production ;
+  - seul Caddy publie des ports (80 et 443). La base et l'API ne sont joignables que sur le réseau interne de Docker ;
+  - HTTPS automatique : il suffit de renseigner `DOMAINE` dans `.env` ;
+  - `compose.yaml` reste réservé au développement (la base seule, port 5432 ouvert sur la machine).
+- **Limites :** pas de sauvegarde automatique de la base, pas de déploiement automatique (CI/CD), un seul serveur.

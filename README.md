@@ -12,8 +12,10 @@ backend/etl/       import : extract (lecture) → transform (nettoyage) → load
 backend/app/       API FastAPI : routes, accès à la base, calculs
 backend/alembic/   migrations de la base de données
 backend/tests/     tests Pytest
-frontend/          interface React + TypeScript (Vite)
+frontend/src/      interface React + TypeScript (Vite)
 docs/decisions.md  décisions techniques et leurs justifications
+compose.yaml       la base seule, pour le développement
+compose.prod.yaml  base + API + site derrière Caddy, pour la production
 ```
 
 - **Base de données :** PostgreSQL 17 dans Docker. 4 tables : `indice`, `source`, `import`, `observation`.
@@ -23,7 +25,7 @@ docs/decisions.md  décisions techniques et leurs justifications
 
 - Python 3.12 ou plus
 - Docker Desktop
-- Node.js (pour le frontend)
+- Node.js 22 ou plus (pour le frontend)
 
 ## Variables d'environnement
 
@@ -64,6 +66,27 @@ uvicorn app.main:app --reload
 
 La documentation interactive de l'API (OpenAPI) est disponible sur http://localhost:8000/docs.
 
+## Lancer le frontend en local
+
+Dans un autre terminal, avec l'API lancée :
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Le site est sur http://localhost:5173. Attention : l'API n'autorise que cette adresse (CORS). Si Vite annonce un autre port, c'est qu'un autre `npm run dev` tourne déjà : il faut l'arrêter.
+
+| Fichier | Rôle |
+|---|---|
+| `src/api.ts` | appels à l'API, et traduction des erreurs en phrases |
+| `src/types.ts` | la forme des données reçues de l'API |
+| `src/App.tsx` | la page : source de l'indice, filtre de période, messages, courbe, comparaison |
+| `src/CourbeAnomalies.tsx` | la courbe Recharts, et les mêmes données en tableau |
+| `src/ComparaisonEpisodes.tsx` | le formulaire de comparaison et le tableau des résultats |
+| `src/interpretation.ts` | mise en forme des nombres et texte d'interprétation prudente |
+
 ## Routes de l'API
 
 | Route | Rôle |
@@ -90,6 +113,50 @@ pytest -v
 
 Limite : les tests de l'API utilisent la base de développement. Une base de test dédiée serait plus robuste.
 
+Tests du frontend, depuis `frontend/` (sans API ni base : les appels sont simulés) :
+
+```bash
+npm test
+```
+
+| Fichier | Ce qui est vérifié |
+|---|---|
+| `App.test.tsx` | changer la période met à jour la courbe ; une période inversée affiche un message d'erreur |
+| `interpretation.test.ts` | format des nombres, saison du pic, prudence de l'interprétation |
+
+## Déploiement sur un VPS
+
+Le déploiement utilise `compose.prod.yaml` : trois conteneurs (`db`, `api`, `web`), et seul Caddy (`web`) est accessible depuis Internet, sur les ports 80 et 443.
+
+```bash
+# 1. Sur le serveur : installer Docker, puis récupérer le projet
+git clone https://github.com/Maoni21/enso-monitor.git
+cd enso-monitor
+
+# 2. Créer le .env (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, et DOMAINE pour le HTTPS)
+cp .env.example .env
+nano .env
+
+# 3. Construire et lancer (les tables sont créées au démarrage de l'API)
+docker compose -f compose.prod.yaml up -d --build
+
+# 4. Importer les données RONI
+docker compose -f compose.prod.yaml exec api python -m etl.load
+```
+
+- **HTTPS :** avec `DOMAINE=enso.mon-domaine.fr` dans `.env`, et le nom de domaine qui pointe vers l'adresse IP du serveur, Caddy obtient et renouvelle seul le certificat.
+- **Mise à jour :** `git pull`, puis la commande de l'étape 3.
+- **Sauvegarde de la base :** `docker compose -f compose.prod.yaml exec db pg_dump -U enso enso > sauvegarde.sql`.
+- **Sécurité :** la base et l'API n'ont aucun port ouvert vers l'extérieur ; le `.env` n'est jamais commité ; Caddy ajoute des en-têtes de sécurité.
+
 ## Utilisation de l'IA
 
-À compléter : outils utilisés et parties assistées.
+L'IA (Claude, d'Anthropic) a été utilisée comme **professeur** pendant tout le projet, et comme **assistant de code** pour une partie de l'interface et de la configuration.
+
+| Partie | Comment elle a été faite |
+|---|---|
+| choix de l'indice, schéma de la base, décisions (`docs/decisions.md`) | proposés par moi, discutés et challengés avec l'IA |
+| `etl/transform.py`, modèles SQLAlchemy, tests Pytest, `comparaison.py`, courbe et filtre | écrits par moi, avec explications et corrections de l'IA |
+| configuration (Docker, Alembic, Vite), `api.ts`, messages d'erreur, comparaison à l'écran, accessibilité, test frontend, déploiement | écrits par l'IA, puis relus et expliqués ligne par ligne |
+
+Règle suivie : aucune ligne ne reste dans le projet si je ne sais pas l'expliquer.
