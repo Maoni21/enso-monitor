@@ -12,8 +12,9 @@ type SourceProps = {
 function Source({ indice }: SourceProps) {
   return (
     <p className="source">
-      Indice {indice.nom} ({indice.nom_complet}), en {indice.unite}. Source : {indice.producteur},{" "}
-      {indice.version}. Données extraites le {indice.date_extraction}.
+      Indice {indice.nom} ({indice.nom_complet}), en {indice.unite}. Source :{" "}
+      <a href={indice.url}>{indice.producteur}</a>, {indice.version}. Données extraites le{" "}
+      {indice.date_extraction}.
     </p>
   );
 }
@@ -55,37 +56,40 @@ function App() {
       <p>Exploration de l'indice RONI de la NOAA</p>
       {indice && <Source indice={indice} />}
 
-      <fieldset>
-        <legend>Période</legend>
-        <label htmlFor="debut">Du</label>
-        <input
-          id="debut"
-          type="date"
-          value={start}
-          onChange={(e) => {
-            setStart(e.target.value);
-            preparerChargement();
-          }}
-        />
-        <label htmlFor="fin">Au</label>
-        <input
-          id="fin"
-          type="date"
-          value={end}
-          onChange={(e) => {
-            setEnd(e.target.value);
-            preparerChargement();
-          }}
-        />
-      </fieldset>
+      <section aria-labelledby="titre-courbe">
+        <h2 id="titre-courbe">Évolution de l'indice</h2>
+        <fieldset>
+          <legend>Période</legend>
+          <label htmlFor="debut">Du</label>
+          <input
+            id="debut"
+            type="date"
+            value={start}
+            onChange={(e) => {
+              setStart(e.target.value);
+              preparerChargement();
+            }}
+          />
+          <label htmlFor="fin">Au</label>
+          <input
+            id="fin"
+            type="date"
+            value={end}
+            onChange={(e) => {
+              setEnd(e.target.value);
+              preparerChargement();
+            }}
+          />
+        </fieldset>
 
-      {erreur && <p role="alert" className="erreur">{erreur}</p>}
-      <p role="status">
-        {chargement && "Chargement des observations…"}
-        {!chargement && !erreur && observations.length === 0 && "Aucune observation sur cette période."}
-        {!chargement && observations.length > 0 && `${observations.length} observations chargées`}
-      </p>
-      {observations.length > 0 && <CourbeAnomalies observations={observations} />}
+        {erreur && <p role="alert" className="erreur">{erreur}</p>}
+        <p role="status">
+          {chargement && "Chargement des observations…"}
+          {!chargement && !erreur && observations.length === 0 && "Aucune observation sur cette période."}
+          {!chargement && observations.length > 0 && `${observations.length} observations chargées`}
+        </p>
+        {observations.length > 0 && <CourbeAnomalies observations={observations} />}
+      </section>
 
       <ComparaisonEpisodes />
     </main>
