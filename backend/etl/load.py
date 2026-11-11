@@ -42,7 +42,6 @@ def date_extraction_depuis_nom(chemin: str) -> datetime.date:
 
 def preparer_observations(propre: pd.DataFrame, indice_id: int, import_id: int) -> list[dict]:
     """Transforme le tableau propre en une liste de dictionnaires, un par observation, prêts à insérer."""
-    # À toi : construis la liste, comme le 27 octobre.
     lignes = []                                   # 1. une liste vide
 
     for ligne in propre.to_dict("records"):        # 2. pour chaque ligne du tableau
