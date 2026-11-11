@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ComparaisonEpisodes from "./ComparaisonEpisodes";
 import CourbeAnomalies from "./CourbeAnomalies";
 import { getIndice, getObservations, messageErreur } from "./api";
 import type { Indice, Observation } from "./types";
@@ -85,6 +86,8 @@ function App() {
         {!chargement && observations.length > 0 && `${observations.length} observations chargées`}
       </p>
       {observations.length > 0 && <CourbeAnomalies observations={observations} />}
+
+      <ComparaisonEpisodes />
     </main>
   );
 }

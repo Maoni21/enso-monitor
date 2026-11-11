@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import App from "./App";
@@ -11,6 +11,11 @@ vi.mock("./api", async (importOriginal) => {
   const original = await importOriginal<typeof import("./api")>();
   return { ...original, getIndice: vi.fn(), getObservations: vi.fn() };
 });
+
+// La comparaison a ses propres champs « Du » et « Au » : on cherche ceux du groupe « Période ».
+function champPeriode(nom: string): HTMLElement {
+  return within(screen.getByRole("group", { name: "Période" })).getByLabelText(nom);
+}
 
 // On remplace aussi la courbe Recharts, qui ne sait pas se dessiner dans jsdom.
 // La fausse courbe affiche simplement combien de points elle a reçus.
@@ -55,8 +60,8 @@ test("changer la période met à jour la courbe", async () => {
   expect(await screen.findByText("Courbe : 4 points")).toBeInTheDocument();
 
   // Agir : l'utilisateur choisit du 1er janvier au 31 décembre 1997.
-  fireEvent.change(screen.getByLabelText("Du"), { target: { value: "1997-01-01" } });
-  fireEvent.change(screen.getByLabelText("Au"), { target: { value: "1997-12-31" } });
+  fireEvent.change(champPeriode("Du"), { target: { value: "1997-01-01" } });
+  fireEvent.change(champPeriode("Au"), { target: { value: "1997-12-31" } });
 
   // Vérifier : l'API a reçu la période, et la courbe n'a plus que 2 points.
   expect(await screen.findByText("Courbe : 2 points")).toBeInTheDocument();
@@ -69,8 +74,8 @@ test("une période inversée affiche un message d'erreur", async () => {
   expect(await screen.findByText("Courbe : 4 points")).toBeInTheDocument();
 
   // Agir : l'utilisateur met une date de début APRÈS la date de fin.
-  fireEvent.change(screen.getByLabelText("Du"), { target: { value: "1998-01-01" } });
-  fireEvent.change(screen.getByLabelText("Au"), { target: { value: "1997-01-01" } });
+  fireEvent.change(champPeriode("Du"), { target: { value: "1998-01-01" } });
+  fireEvent.change(champPeriode("Au"), { target: { value: "1997-01-01" } });
 
   // Vérifier : le message d'erreur est annoncé, et la courbe n'est plus affichée.
   expect(await screen.findByRole("alert")).toHaveTextContent(
